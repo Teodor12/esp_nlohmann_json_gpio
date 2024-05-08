@@ -35,27 +35,25 @@ namespace wifi
         /* Function to begin connection to wifi. Must be called after wifi_handler_start()*/
         esp_err_t wifi_handler_start();
 
-        enum class wifi_state_t {
-            NOT_INITIALISED,
-            INITIALISED,
-            READY_TO_CONNECT,
-            CONNECTING,
-            WAITING_FOR_IP,
-            CONNECTED,
-            DISCONNECTED,
-            ERROR
-        };
+    private:
+        char mac_address_cstr[MAC_ADDR_CS_LEN]{};
+        static constexpr char *ssid = {"CUMYNET_REP1"};
+        static constexpr char *password = {"123456789a"};
+        SemaphoreHandle_t wifi_init_mutex;
+        esp_err_t _init_nvs_partition();
+        esp_err_t _get_mac_address();
+        esp_err_t  _init();
+        //esp_err_t _set_wifi_credentials();
+        esp_err_t _start();
 
-        private:
-            char mac_address_cstr[MAC_ADDR_CS_LEN]{};
-            static constexpr char *ssid = {"CUMYNET_REP1"};
-            static constexpr char *password = {"123456789a"};
-            SemaphoreHandle_t wifi_init_mutex;
-            esp_err_t _init_nvs_partition();
-            esp_err_t _get_mac_address();
-            esp_err_t  _init();
-            //esp_err_t _set_wifi_credentials();
-            esp_err_t _start();
+        static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+        enum class wifi_state_t {
+                NOT_INITIALISED,
+                INITIALISED,
+                CONNECTED,
+                DISCONNECTED,
+                ERROR
+        } wifi_state;
     };
 };
 

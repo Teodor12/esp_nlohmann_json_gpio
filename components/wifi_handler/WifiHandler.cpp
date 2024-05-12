@@ -7,7 +7,72 @@ namespace wifi
     WifiHandler::WifiHandler()
     {
         wifi_init_mutex = xSemaphoreCreateMutex();
-        wifi_state = wifi_state_t::NOT_INITIALISED;
+        state = wifi_state_t::NOT_INITIALISED;
+        memset(mac_address_cstr, 0, MAC_ADDR_CS_LEN);
+    }
+
+    static void wifi_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data)
+    {
+        /* int32_t -> wifi_event_t enum */
+        auto wifi_event_num = static_cast<wifi_event_t>(event_id);
+
+        switch (wifi_event_num) {
+            case WIFI_EVENT_STA_START: {
+                wifi_handler->set_wifi_state(wifi_state_t::WAITING_FOR_IP);
+                ESP_LOGI(WIFI_LOG_TAG, "Calling esp_wifi_connect...");
+                esp_wifi_connect();
+                break;
+            }
+            case WIFI_EVENT_STA_DISCONNECTED: {
+                wifi_handler->set_wifi_state(wifi_state_t::DISCONNECTED);
+                vTaskDelay(pdMS_TO_TICKS(5000));
+                ESP_LOGI(WIFI_LOG_TAG, "reconnecting to AP...");
+                esp_wifi_connect();
+                break;
+            }
+            default: {
+                break;
+            }
+
+        }
+    }
+
+    static void ip_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data)
+    {
+        /* int32_t -> ip_event_t enum */
+        auto ip_event_num = static_cast<ip_event_t>(event_id);
+
+        switch (ip_event_num) {
+            case IP_EVENT_STA_GOT_IP: {
+                wifi_handler->set_wifi_state(wifi_state_t::CONNECTED);
+                auto *event = static_cast<ip_event_got_ip_t*>(event_data);
+                ESP_LOGI(WIFI_LOG_TAG, "Connected to AP. IP-address: " IPSTR, IP2STR(&event->ip_info.ip));
+                break;
+            }
+            case IP_EVENT_STA_LOST_IP: {
+                wifi_handler->set_wifi_state(wifi_state_t::WAITING_FOR_IP);
+                ESP_LOGI(WIFI_LOG_TAG, "Device ip-address becamo invalid.");
+                break;
+            }
+            default: {
+                break;
+            }
+
+        }
+    }
+
+    static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+    {
+        auto *wifi_handler = reinterpret_cast<WifiHandler*>(arg);
+        if(event_base == WIFI_EVENT) {
+            return wifi_event_handler(wifi_handler, event_base, event_id, event_data);
+        }
+        else if(event_base == IP_EVENT) {
+            ip_event_handler(wifi_handler, event_base, event_id, event_data);
+        }
+        else {
+            ESP_LOGW(WIFI_LOG_TAG, "unknown event arisen");
+        }
     }
 
     esp_err_t WifiHandler::_init_nvs_partition() {
@@ -35,7 +100,6 @@ namespace wifi
             ESP_LOGE(WIFI_LOG_TAG, "unable to query mac address from EFUSE");
             return ret;
         }
-
         snprintf(static_cast<char *>(this->mac_address_cstr), MAC_ADDR_CS_LEN, "%02x:%02x:%02x:%02x:%02x:%02x",
                  mac_address_bytes[0],
                  mac_address_bytes[1],
@@ -114,13 +178,13 @@ namespace wifi
             return ESP_FAIL;
         }
 
-        ret = esp_event_handler_instance_register(WIFI_EVENT,ESP_EVENT_ANY_ID,&event_handler,nullptr,nullptr);
+        ret = esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, this, nullptr);
         if(ret != ESP_OK) {
             ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
             return ret;
         }
 
-        ret = esp_event_handler_instance_register(IP_EVENT,ESP_EVENT_ANY_ID,&event_handler,nullptr,nullptr);
+        ret = esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &event_handler, this, nullptr);
         if(ret != ESP_OK) {
             ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
             return ret;
@@ -132,12 +196,12 @@ namespace wifi
             return ESP_FAIL;
         }
 
-        wifi_config_t wifi_config;
-        memcpy(wifi_config.sta.ssid, wifi::WifiHandler::ssid, strlen(wifi::WifiHandler::ssid) + 1);
-        memcpy(wifi_config.sta.password, wifi::WifiHandler::password, strlen(wifi::WifiHandler::password) + 1);
+        wifi_config_t wifi_config{};
+        memcpy(wifi_config.sta.ssid, wifi::WifiHandler::ssid, strlen(wifi::WifiHandler::ssid));
+        memcpy(wifi_config.sta.password, wifi::WifiHandler::password, strlen(wifi::WifiHandler::password));
 
-        ESP_LOGI(WIFI_LOG_TAG, "%s %d", wifi_config.sta.ssid, __LINE__);
-        ESP_LOGI(WIFI_LOG_TAG, "%s %d", wifi_config.sta.password, __LINE__);
+        /* ESP_LOGI(WIFI_LOG_TAG, "%s %d", wifi_config.sta.ssid, __LINE__); */
+        /* ESP_LOGI(WIFI_LOG_TAG, "%s %d", wifi_config.sta.password, __LINE__); */
 
         wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
         wifi_config.sta.pmf_cfg.capable = true;
@@ -147,14 +211,19 @@ namespace wifi
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
         xSemaphoreGive(wifi_init_mutex);
 
-        wifi_state = wifi_state_t::INITIALISED;
+        if(xSemaphoreTake(wifi_init_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
+            ESP_LOGE(WIFI_LOG_TAG, "unable to obtain 'wifi_init_mutex'");
+            return ESP_FAIL;
+        }
+        state = wifi_state_t::INITIALISED;
+        xSemaphoreGive(wifi_init_mutex);
+
         std::cout << " WifiHandler successfully initialized." << std::endl;
 
         return ret;
     }
 
     esp_err_t WifiHandler::wifi_handler_init() {
-
         return _init();
     }
 
@@ -164,68 +233,10 @@ namespace wifi
     }
 
     esp_err_t WifiHandler::wifi_handler_start() {
-        if(wifi_state != wifi_state_t::INITIALISED){
+        if(state != wifi_state_t::INITIALISED){
             return ESP_FAIL;
         }
         return _start();
-    }
-
-    static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
-    {
-        /* int32_t -> enum */
-        auto wifi_event_num = static_cast<wifi_event_t>(event_id);
-
-        switch (wifi_event_num) {
-            case WIFI_EVENT_STA_START: {
-                ESP_LOGI(WIFI_LOG_TAG, "Calling esp_wifi_connect...");
-                esp_wifi_connect();
-                break;
-            }
-            case WIFI_EVENT_STA_DISCONNECTED: {
-                vTaskDelay(pdMS_TO_TICKS(5000));
-                ESP_LOGI(WIFI_LOG_TAG, "reconnecting to AP...");
-                esp_wifi_connect();
-                break;
-            }
-            default: {
-                break;
-            }
-
-        }
-    }
-
-    static void ip_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
-    {
-        auto ip_event_num = static_cast<ip_event_t>(event_id);
-
-        switch (ip_event_num) {
-            case IP_EVENT_STA_GOT_IP: {
-                auto *event = static_cast<ip_event_got_ip_t*>(event_data);
-                ESP_LOGI(WIFI_LOG_TAG, "Connected to AP. IP-address: " IPSTR, IP2STR(&event->ip_info.ip));
-                break;
-            }
-            case IP_EVENT_STA_LOST_IP: {
-                ESP_LOGI(WIFI_LOG_TAG, "%d", IP_EVENT_STA_LOST_IP);
-                break;
-            }
-            default: {
-                break;
-            }
-
-        }
-    }
-
-    void WifiHandler::event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
-    {
-        if(event_base == WIFI_EVENT) {
-            return wifi_event_handler(arg, event_base, event_id, event_data);
-        }
-        else if(event_base == IP_EVENT) {
-            ip_event_handler(arg, event_base, event_id, event_data);
-        }
-        else {
-            ESP_LOGW(WIFI_LOG_TAG, "unknown event arisen");
-        }
     }
 
 } // namespace wifi

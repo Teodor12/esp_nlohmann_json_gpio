@@ -11,7 +11,7 @@ namespace wifi
         memset(mac_address_cstr, 0, MAC_ADDR_CS_LEN);
     }
 
-    static void wifi_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data)
+    void wifi_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data)
     {
         /* int32_t -> wifi_event_t enum */
         auto wifi_event_num = static_cast<wifi_event_t>(event_id);
@@ -25,8 +25,8 @@ namespace wifi
             }
             case WIFI_EVENT_STA_DISCONNECTED: {
                 wifi_handler->set_wifi_state(wifi_state_t::DISCONNECTED);
+                ESP_LOGI(WIFI_LOG_TAG, "device disconnected, reconnecting to AP...");
                 vTaskDelay(pdMS_TO_TICKS(5000));
-                ESP_LOGI(WIFI_LOG_TAG, "reconnecting to AP...");
                 esp_wifi_connect();
                 break;
             }
@@ -37,7 +37,7 @@ namespace wifi
         }
     }
 
-    static void ip_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data)
+    void ip_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data)
     {
         /* int32_t -> ip_event_t enum */
         auto ip_event_num = static_cast<ip_event_t>(event_id);
@@ -47,11 +47,12 @@ namespace wifi
                 wifi_handler->set_wifi_state(wifi_state_t::CONNECTED);
                 auto *event = static_cast<ip_event_got_ip_t*>(event_data);
                 ESP_LOGI(WIFI_LOG_TAG, "Connected to AP. IP-address: " IPSTR, IP2STR(&event->ip_info.ip));
+                vTaskDelay(pdMS_TO_TICKS(5000));
                 break;
             }
             case IP_EVENT_STA_LOST_IP: {
                 wifi_handler->set_wifi_state(wifi_state_t::WAITING_FOR_IP);
-                ESP_LOGI(WIFI_LOG_TAG, "Device ip-address becamo invalid.");
+                ESP_LOGI(WIFI_LOG_TAG, "Device ip-address became invalid.");
                 break;
             }
             default: {
@@ -61,7 +62,7 @@ namespace wifi
         }
     }
 
-    static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+    void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
     {
         auto *wifi_handler = reinterpret_cast<WifiHandler*>(arg);
         if(event_base == WIFI_EVENT) {
@@ -139,6 +140,7 @@ namespace wifi
         ret = esp_netif_init();
         if(ret != ESP_OK){
             ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
+            xSemaphoreGive(wifi_init_mutex);
             return ret;
         }
         xSemaphoreGive(wifi_init_mutex);
@@ -149,6 +151,7 @@ namespace wifi
         }        ret = esp_event_loop_create_default();
         if(ret != ESP_OK){
             ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
+            xSemaphoreGive(wifi_init_mutex);
             return ret;
         }
         xSemaphoreGive(wifi_init_mutex);
@@ -169,6 +172,7 @@ namespace wifi
         ret = esp_wifi_init(&cfg);
         if(ret != ESP_OK) {
             ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
+            xSemaphoreGive(wifi_init_mutex);
             return ret;
         }
         xSemaphoreGive(wifi_init_mutex);
@@ -181,27 +185,36 @@ namespace wifi
         ret = esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, this, nullptr);
         if(ret != ESP_OK) {
             ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
+            xSemaphoreGive(wifi_init_mutex);
             return ret;
         }
 
         ret = esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &event_handler, this, nullptr);
         if(ret != ESP_OK) {
             ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
+            xSemaphoreGive(wifi_init_mutex);
             return ret;
         }
         xSemaphoreGive(wifi_init_mutex);
+
 
         if(xSemaphoreTake(wifi_init_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
             ESP_LOGE(WIFI_LOG_TAG, "unable to obtain 'wifi_init_mutex'");
             return ESP_FAIL;
         }
 
-        wifi_config_t wifi_config{};
-        memcpy(wifi_config.sta.ssid, wifi::WifiHandler::ssid, strlen(wifi::WifiHandler::ssid));
-        memcpy(wifi_config.sta.password, wifi::WifiHandler::password, strlen(wifi::WifiHandler::password));
+        ret = _set_wifi_credentials();
+        if(ret != ESP_OK){
+            xSemaphoreGive(wifi_init_mutex);
+            return ESP_FAIL;
+        }
 
-        /* ESP_LOGI(WIFI_LOG_TAG, "%s %d", wifi_config.sta.ssid, __LINE__); */
-        /* ESP_LOGI(WIFI_LOG_TAG, "%s %d", wifi_config.sta.password, __LINE__); */
+        wifi_config_t wifi_config{};
+        const char *ssid_cstr = wifi::WifiHandler::ssid.c_str();
+        const char *password_cstr = wifi::WifiHandler::password.c_str();
+
+        memcpy(wifi_config.sta.ssid, ssid_cstr, strlen(ssid_cstr));
+        memcpy(wifi_config.sta.password, password_cstr, strlen(password_cstr));
 
         wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
         wifi_config.sta.pmf_cfg.capable = true;
@@ -227,16 +240,51 @@ namespace wifi
         return _init();
     }
 
-    esp_err_t WifiHandler::_start() {
-        esp_err_t ret = esp_wifi_start();
-        return ret;
-    }
-
     esp_err_t WifiHandler::wifi_handler_start() {
         if(state != wifi_state_t::INITIALISED){
             return ESP_FAIL;
         }
         return _start();
     }
+
+    esp_err_t WifiHandler::_start() {
+        esp_err_t ret = esp_wifi_start();
+        return ret;
+    }
+
+    esp_err_t WifiHandler::_set_wifi_credentials() {
+
+        std::string config_ssid = CONFIG_ESP_WIFI_SSID;
+        size_t ssid_size = config_ssid.length();
+        if(ssid_size == 0 || ssid_size > 32){
+            ESP_LOGE(WIFI_LOG_TAG, "invalid ssid");
+            return ESP_FAIL;
+        }
+
+        std::string config_password = CONFIG_ESP_WIFI_PASSWORD;
+        size_t password_size = config_password.length();
+        if(password_size > 64){
+            ESP_LOGE(WIFI_LOG_TAG, "invalid password");
+            return ESP_FAIL;
+        }
+
+        ssid = config_ssid;
+        password = config_password;
+
+
+        return ESP_OK;
+    }
+
+    void WifiHandler::set_wifi_state(wifi_state_t new_state) {
+        this->state = new_state;
+    }
+
+    wifi_state_t WifiHandler::get_wifi_state() const {
+        wifi_state_t result = this->state;
+        return result;
+    }
+
+
+
 
 } // namespace wifi

@@ -36,26 +36,25 @@ namespace wifi
         /* Function to begin connection to wifi. Must be called after wifi_handler_start()*/
         esp_err_t wifi_handler_start();
 
-        /* Getter for wifi_state */
-        wifi_state_t get_wifi_state() const {
-            return this->state;
-        }
-
-        /* Setter for wifi_state */
-        void set_wifi_state(wifi_state_t new_state) {
-            this->state = new_state;
-        }
 
     private:
         char mac_address_cstr[MAC_ADDR_CS_LEN]{};
+        std::string ssid;
+        std::string password;
         wifi_state_t state;
-        static constexpr char *ssid = CONFIG_ESP_WIFI_SSID;
-        static constexpr char *password = CONFIG_ESP_WIFI_PASSWORD;
         SemaphoreHandle_t wifi_init_mutex;
         esp_err_t _init_nvs_partition();
         esp_err_t _get_mac_address();
         esp_err_t _init();
         esp_err_t _start();
+        esp_err_t _set_wifi_credentials();
+        void set_wifi_state(wifi_state_t new_state);
+        wifi_state_t get_wifi_state() const;
+
+        friend void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+        friend void wifi_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data);
+        friend void ip_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data);
+
     };
 
     enum class wifi_state_t {
@@ -68,5 +67,4 @@ namespace wifi
 
 
 };
-
 

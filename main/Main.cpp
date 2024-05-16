@@ -5,15 +5,13 @@ static Main main_entry;
 
 esp_err_t Main::setup()
 {
-    esp_err_t ret{ESP_OK};
-
     WifiHandler wifi_handler;
-    ret = wifi_handler.wifi_handler_init();
-    ret= wifi_handler.wifi_handler_start();
-    return ret;
+    ESP_ERROR_CHECK(wifi_handler.wifi_handler_init());
+    ESP_ERROR_CHECK(wifi_handler.wifi_handler_start());
+    return ESP_OK;
 }
 
-void Main::loop(void){
+void Main::loop(){
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }

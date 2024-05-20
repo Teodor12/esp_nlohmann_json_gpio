@@ -7,14 +7,23 @@
 #include "nvs_flash.h"
 #include "json_handler.hpp"
 #include "WifiHandler.hpp"
+#include "MQTTHandler.hpp"
 
 using namespace wifi;
+using namespace mqtt;
 
 class Main final {
 
 public:
 
-    static constexpr char *MAIN_LOG_TAG{"MAIN"};
+    WifiHandler wifi_handler;
+    MQTTHandler mqtt_handler;
     esp_err_t setup();
-    void loop();
+
+    [[noreturn]] void loop();
+
 };
+
+void wifi_connected_cb();
+
+void wifi_disconnected_cb();

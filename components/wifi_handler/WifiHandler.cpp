@@ -4,11 +4,11 @@
 namespace wifi
 {
 
-    WifiHandler::WifiHandler()
-    {
+    WifiHandler::WifiHandler() {
         wifi_init_mutex = xSemaphoreCreateMutex();
         state = wifi_state_t::NOT_INITIALISED;
         memset(mac_address_cstr, 0, MAC_ADDR_CS_LEN);
+
     }
 
     void wifi_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -25,15 +25,19 @@ namespace wifi
             }
             case WIFI_EVENT_STA_DISCONNECTED: {
                 wifi_handler->set_wifi_state(wifi_state_t::DISCONNECTED);
+                /* Call the callback only once, eg: close the mqtt client, socket only once */
+                if(wifi_handler->disconnected_cb_requested ) {
+                    wifi_handler->f_disconnected();
+                    wifi_handler->disconnected_cb_requested = false;
+                }
                 ESP_LOGI(WIFI_LOG_TAG, "device disconnected, reconnecting to AP...");
-                vTaskDelay(pdMS_TO_TICKS(5000));
+                vTaskDelay(pdMS_TO_TICKS(2500));
                 esp_wifi_connect();
                 break;
             }
             default: {
                 break;
             }
-
         }
     }
 
@@ -47,7 +51,9 @@ namespace wifi
                 wifi_handler->set_wifi_state(wifi_state_t::CONNECTED);
                 auto *event = static_cast<ip_event_got_ip_t*>(event_data);
                 ESP_LOGI(WIFI_LOG_TAG, "Connected to AP. IP-address: " IPSTR, IP2STR(&event->ip_info.ip));
-                vTaskDelay(pdMS_TO_TICKS(5000));
+                /* Reset the flag */
+                wifi_handler->disconnected_cb_requested = true;
+                wifi_handler->f_connected();
                 break;
             }
             case IP_EVENT_STA_LOST_IP: {
@@ -113,7 +119,7 @@ namespace wifi
         return ret;
     }
 
-    esp_err_t WifiHandler::_init() {
+    esp_err_t WifiHandler::_init(const std::function<void(void)>& on_connected_cb, const std::function<void(void)>& on_disconnected_cb) {
 
         esp_err_t ret = ESP_OK;
 
@@ -132,6 +138,10 @@ namespace wifi
         }
         std::cout << "Preprogrammed mac-address obtained: " << mac_address_cstr << std::endl;
 
+        /* Setting the provided callbacks */
+        f_connected = on_connected_cb;
+        f_disconnected  = on_disconnected_cb;
+
         /* 1. init phase */
         if(xSemaphoreTake(wifi_init_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
             ESP_LOGE(WIFI_LOG_TAG, "unable to obtain 'wifi_init_mutex'");
@@ -148,7 +158,9 @@ namespace wifi
         if(xSemaphoreTake(wifi_init_mutex, pdMS_TO_TICKS(10)) != pdTRUE) {
             ESP_LOGE(WIFI_LOG_TAG, "unable to obtain 'wifi_init_mutex'");
             return ESP_FAIL;
-        }        ret = esp_event_loop_create_default();
+        }
+
+        ret = esp_event_loop_create_default();
         if(ret != ESP_OK){
             ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
             xSemaphoreGive(wifi_init_mutex);
@@ -236,8 +248,8 @@ namespace wifi
         return ret;
     }
 
-    esp_err_t WifiHandler::wifi_handler_init() {
-        return _init();
+    esp_err_t WifiHandler::wifi_handler_init(const on_wifi_connected_callback& on_connected_cb, const on_wifi_disconnected_callback& on_disconnected_cb) {
+        return _init(on_connected_cb, on_disconnected_cb);
     }
 
     esp_err_t WifiHandler::wifi_handler_start() {
@@ -283,8 +295,5 @@ namespace wifi
         wifi_state_t result = this->state;
         return result;
     }
-
-
-
 
 } // namespace wifi

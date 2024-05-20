@@ -11,6 +11,7 @@
 #include "nvs_flash.h"
 #include "iostream"
 #include <algorithm>
+#include <functional>
 #include <cstring>
 
 #define MAC_ADDR_BYTE_LENGTH 6
@@ -20,6 +21,9 @@
 namespace wifi
 {
     enum class wifi_state_t;
+
+    using on_wifi_connected_callback = std::function<void(void)>;
+    using on_wifi_disconnected_callback = std::function<void(void)>;
 
     class WifiHandler final {
 
@@ -31,7 +35,7 @@ namespace wifi
         ~WifiHandler() = default;
 
         /* Initialization function for WifiHandler instace. Must be called before wifi_handler_start()! */
-        esp_err_t wifi_handler_init();
+        esp_err_t wifi_handler_init(const on_wifi_connected_callback& on_connected_cb, const on_wifi_disconnected_callback& on_disconnected_cb);
 
         /* Function to begin connection to wifi. Must be called after wifi_handler_start()*/
         esp_err_t wifi_handler_start();
@@ -41,11 +45,14 @@ namespace wifi
         char mac_address_cstr[MAC_ADDR_CS_LEN]{};
         std::string ssid;
         std::string password;
+        bool disconnected_cb_requested = true;
         wifi_state_t state;
         SemaphoreHandle_t wifi_init_mutex;
+        on_wifi_connected_callback f_connected;
+        on_wifi_disconnected_callback f_disconnected;
         esp_err_t _init_nvs_partition();
         esp_err_t _get_mac_address();
-        esp_err_t _init();
+        esp_err_t _init(const std::function<void(void)>& on_connected_cb, const std::function<void(void)>& on_disconnected_cb);
         esp_err_t _start();
         esp_err_t _set_wifi_credentials();
         void set_wifi_state(wifi_state_t new_state);
@@ -65,6 +72,4 @@ namespace wifi
         DISCONNECTED
     };
 
-
-};
-
+} // namespace wifi

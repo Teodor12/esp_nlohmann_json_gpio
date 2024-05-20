@@ -33,23 +33,26 @@ namespace mqtt{
 
         switch (mqtt_event_num) {
             case MQTT_EVENT_CONNECTED: {
-                mqtt_handler->mqtt_state = MQTTHandler::mqtt_state_t::MQTT_CONNECTED;
+                mqtt_handler->set_mqtt_state(MQTTHandler::mqtt_state_t::MQTT_CONNECTED);
                 ESP_LOGI(MQTT_LOG_TAG, "device established connection with broker");
                 esp_mqtt_client_subscribe(mqtt_handler->mqtt_client, MQTT_TOPIC,0);
                 break;
             }
             case MQTT_EVENT_DISCONNECTED: {
-                mqtt_handler->mqtt_state = MQTTHandler::mqtt_state_t::MQTT_DISCONNECTED;
+                mqtt_handler->set_mqtt_state(MQTTHandler::mqtt_state_t::MQTT_DISCONNECTED);
                 ESP_LOGI(MQTT_LOG_TAG, "device lost connection with broker");
+                vTaskDelay(pdMS_TO_TICKS(5000));
+                ESP_LOGI(MQTT_LOG_TAG, "reconnecting to broker...");
+                esp_mqtt_client_reconnect(mqtt_handler->mqtt_client);
                 break;
             }
             case MQTT_EVENT_SUBSCRIBED: {
-                mqtt_handler->mqtt_state = MQTTHandler::mqtt_state_t::MQTT_SUBSCRIBED;
+                mqtt_handler->set_mqtt_state(MQTTHandler::mqtt_state_t::MQTT_SUBSCRIBED);
                 ESP_LOGI(MQTT_LOG_TAG, "device successfully subscribed to topic");
                 break;
             }
             case MQTT_EVENT_UNSUBSCRIBED: {
-                mqtt_handler->mqtt_state = MQTTHandler::mqtt_state_t::MQTT_UNSUBSCRIBED;
+                mqtt_handler->set_mqtt_state(MQTTHandler::mqtt_state_t::MQTT_UNSUBSCRIBED);
                 ESP_LOGI(MQTT_LOG_TAG, "device successfully unsubscribed from topic");
                 break;
             }
@@ -65,6 +68,18 @@ namespace mqtt{
                 break;
             }
         }
+    }
+
+    esp_err_t MQTTHandler::mqtt_handler_init() {
+        return _init();
+    }
+
+    esp_err_t MQTTHandler::mqtt_handler_start() {
+        return _start();
+    }
+
+    esp_err_t MQTTHandler::mqtt_handler_suspend() {
+        return _suspend();
     }
 
     esp_err_t MQTTHandler::_init() {
@@ -113,16 +128,15 @@ namespace mqtt{
         return ret;
     }
 
-
-    esp_err_t MQTTHandler::mqtt_handler_init() {
-        return _init();
+    esp_err_t MQTTHandler::_suspend() {
+        return esp_mqtt_client_disconnect(mqtt_client);
     }
 
-    esp_err_t MQTTHandler::mqtt_handler_start() {
-        return _start();
+    MQTTHandler::mqtt_state_t MQTTHandler::get_mqtt_state() const {
+        return mqtt_state;
     }
 
-
-}
-
-
+    void MQTTHandler::set_mqtt_state(MQTTHandler::mqtt_state_t mqttState) {
+        mqtt_state = mqttState;
+    }
+} //namespace mqtt

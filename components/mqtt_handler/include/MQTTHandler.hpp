@@ -17,12 +17,14 @@ namespace mqtt{
 
         esp_err_t mqtt_handler_start();
 
+        esp_err_t mqtt_handler_suspend();
 
     private:
         esp_mqtt_client_handle_t mqtt_client = nullptr;
         SemaphoreHandle_t mqtt_init_mutex;
         esp_err_t _init();
         esp_err_t _start();
+        esp_err_t _suspend();
 
         enum class mqtt_state_t {
             MQTT_NOT_INITIALISED,
@@ -33,11 +35,11 @@ namespace mqtt{
             MQTT_UNSUBSCRIBED
         } mqtt_state;
 
+        mqtt_state_t get_mqtt_state() const;
+
+        void set_mqtt_state(mqtt_state_t new_mqtt_state);
+
         friend void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_id, void *event_data);
 
     };
 }
-
-
-
-

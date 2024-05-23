@@ -1,2 +1,3 @@
-idf_component_register(SRCS "json_validator.cpp"
-                    INCLUDE_DIRS "include")
+set(SOURCES json_validator.cpp)
+
+idf_component_register(SRCS ${SOURCES} INCLUDE_DIRS "include")

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <functional>
+#include <cstring>
+#include <iostream>
+
 #include "esp_mac.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -9,10 +14,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "nvs_flash.h"
-#include "iostream"
-#include <algorithm>
-#include <functional>
-#include <cstring>
+
 
 #define MAC_ADDR_BYTE_LENGTH 6
 #define MAC_ADDR_CS_LEN     18
@@ -20,7 +22,6 @@
 
 namespace wifi
 {
-    enum class wifi_state_t;
 
     using on_wifi_connected_callback = std::function<void(void)>;
     using on_wifi_disconnected_callback = std::function<void(void)>;
@@ -46,7 +47,14 @@ namespace wifi
         std::string ssid;
         std::string password;
         bool disconnected_cb_requested = true;
-        wifi_state_t state;
+        enum class wifi_state_t {
+            NOT_INITIALISED,
+            INITIALISED,
+            WAITING_FOR_IP,
+            CONNECTED,
+            DISCONNECTED
+        } state;
+
         SemaphoreHandle_t wifi_init_mutex;
         on_wifi_connected_callback f_connected;
         on_wifi_disconnected_callback f_disconnected;
@@ -64,12 +72,6 @@ namespace wifi
 
     };
 
-    enum class wifi_state_t {
-        NOT_INITIALISED,
-        INITIALISED,
-        WAITING_FOR_IP,
-        CONNECTED,
-        DISCONNECTED
-    };
+
 
 } // namespace wifi

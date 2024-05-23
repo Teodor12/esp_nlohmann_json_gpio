@@ -5,7 +5,6 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
-#include "json_handler.hpp"
 #include "WifiHandler.hpp"
 #include "MQTTHandler.hpp"
 

@@ -6,6 +6,7 @@ static Main main_entry;
 
 esp_err_t Main::setup()
 {
+    ESP_ERROR_CHECK(gpio_init(25,26,27));
     ESP_ERROR_CHECK(mqtt_handler.mqtt_handler_init());
     ESP_ERROR_CHECK(wifi_handler.wifi_handler_init(wifi_connected_cb, wifi_disconnected_cb));
     ESP_ERROR_CHECK(wifi_handler.wifi_handler_start());
@@ -29,5 +30,4 @@ void wifi_disconnected_cb() {
 extern "C" void app_main(void)
 {
     ESP_ERROR_CHECK(main_entry.setup());
-    
 }

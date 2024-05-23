@@ -18,13 +18,13 @@ namespace wifi
 
         switch (wifi_event_num) {
             case WIFI_EVENT_STA_START: {
-                wifi_handler->set_wifi_state(wifi_state_t::WAITING_FOR_IP);
+                wifi_handler->set_wifi_state(WifiHandler::wifi_state_t::WAITING_FOR_IP);
                 ESP_LOGI(WIFI_LOG_TAG, "Calling esp_wifi_connect...");
                 esp_wifi_connect();
                 break;
             }
             case WIFI_EVENT_STA_DISCONNECTED: {
-                wifi_handler->set_wifi_state(wifi_state_t::DISCONNECTED);
+                wifi_handler->set_wifi_state(WifiHandler::wifi_state_t::DISCONNECTED);
                 /* Call the callback only once, eg: close the mqtt client, socket only once */
                 if(wifi_handler->disconnected_cb_requested ) {
                     wifi_handler->f_disconnected();
@@ -48,7 +48,7 @@ namespace wifi
 
         switch (ip_event_num) {
             case IP_EVENT_STA_GOT_IP: {
-                wifi_handler->set_wifi_state(wifi_state_t::CONNECTED);
+                wifi_handler->set_wifi_state(WifiHandler::wifi_state_t::CONNECTED);
                 auto *event = static_cast<ip_event_got_ip_t*>(event_data);
                 ESP_LOGI(WIFI_LOG_TAG, "Connected to AP. IP-address: " IPSTR, IP2STR(&event->ip_info.ip));
                 /* Reset the flag */
@@ -57,7 +57,7 @@ namespace wifi
                 break;
             }
             case IP_EVENT_STA_LOST_IP: {
-                wifi_handler->set_wifi_state(wifi_state_t::WAITING_FOR_IP);
+                wifi_handler->set_wifi_state(WifiHandler::wifi_state_t::WAITING_FOR_IP);
                 ESP_LOGI(WIFI_LOG_TAG, "Device ip-address became invalid.");
                 break;
             }
@@ -291,9 +291,10 @@ namespace wifi
         this->state = new_state;
     }
 
-    wifi_state_t WifiHandler::get_wifi_state() const {
+    WifiHandler::wifi_state_t WifiHandler::get_wifi_state() const {
         wifi_state_t result = this->state;
         return result;
     }
+
 
 } // namespace wifi

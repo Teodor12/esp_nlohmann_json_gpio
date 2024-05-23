@@ -1,1 +1,1 @@
-idf_component_register(SRCS "Main.cpp" INCLUDE_DIRS "include" REQUIRES wifi_handler mqtt_handler gpio_handler)
+idf_component_register(SRCS "Main.cpp" INCLUDE_DIRS "include" REQUIRES wifi_handler mqtt_handler)

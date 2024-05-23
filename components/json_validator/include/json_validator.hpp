@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <iostream>
+#include "esp_system.h"
 #include "json.hpp"
 
 using json = nlohmann::json;

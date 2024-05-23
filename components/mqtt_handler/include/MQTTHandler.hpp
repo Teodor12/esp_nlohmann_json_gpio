@@ -1,7 +1,8 @@
 #pragma once
 
+#include <functional>
 #include "mqtt_client.h"
-#include "esp_log.h"
+#include "GpioHandler.hpp"
 
 namespace mqtt{
 
@@ -42,4 +43,5 @@ namespace mqtt{
         friend void mqtt_event_handler(void *arg, esp_event_base_t base, int32_t event_id, void *event_data);
 
     };
-}
+
+} //namespace mqtt

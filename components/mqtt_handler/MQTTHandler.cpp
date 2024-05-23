@@ -1,8 +1,6 @@
 #include "include/MQTTHandler.hpp"
-
 #include <iostream>
-#include <string>
-
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -60,8 +58,11 @@ namespace mqtt{
                 break;
             }
             case MQTT_EVENT_DATA: {
-                ESP_LOGI(MQTT_LOG_TAG, "Topic:%.*s", mqtt_event_data->topic_len, mqtt_event_data->topic);
-                ESP_LOGI(MQTT_LOG_TAG, "Data:%.*s", mqtt_event_data->data_len, mqtt_event_data->data);
+                ESP_LOGD(MQTT_LOG_TAG, "Topic:%.*s", mqtt_event_data->topic_len, mqtt_event_data->topic);
+                ESP_LOGD(MQTT_LOG_TAG, "Data:%.*s", mqtt_event_data->data_len, mqtt_event_data->data);
+                std::string gpio_request_json(mqtt_event_data->data, mqtt_event_data->data_len);
+                GpioRequest gpio_request = create_gpio_request(gpio_request_json);
+                update_gpio_levels(gpio_request);
                 break;
             }
             default: {

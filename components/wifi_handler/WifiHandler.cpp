@@ -3,10 +3,9 @@
 
 namespace wifi
 {
-
     WifiHandler::WifiHandler() {
-        wifi_init_mutex = xSemaphoreCreateMutex();
-        state = wifi_state_t::NOT_INITIALISED;
+        wifi_state = wifi_state_t::NOT_INITIALISED;
+        disconnected_cb_requested = false;
         memset(mac_address_cstr, 0, MAC_ADDR_CS_LEN);
 
     }
@@ -18,13 +17,13 @@ namespace wifi
 
         switch (wifi_event_num) {
             case WIFI_EVENT_STA_START: {
-                wifi_handler->set_wifi_state(WifiHandler::wifi_state_t::WAITING_FOR_IP);
+                wifi_handler->_set_wifi_state(WifiHandler::wifi_state_t::WAITING_FOR_IP);
                 ESP_LOGI(WIFI_LOG_TAG, "Calling esp_wifi_connect...");
                 esp_wifi_connect();
                 break;
             }
             case WIFI_EVENT_STA_DISCONNECTED: {
-                wifi_handler->set_wifi_state(WifiHandler::wifi_state_t::DISCONNECTED);
+                wifi_handler->_set_wifi_state(WifiHandler::wifi_state_t::DISCONNECTED);
                 /* Call the callback only once, eg: close the mqtt client, socket only once */
                 if(wifi_handler->disconnected_cb_requested ) {
                     wifi_handler->f_disconnected();
@@ -48,16 +47,16 @@ namespace wifi
 
         switch (ip_event_num) {
             case IP_EVENT_STA_GOT_IP: {
-                wifi_handler->set_wifi_state(WifiHandler::wifi_state_t::CONNECTED);
+                wifi_handler->_set_wifi_state(WifiHandler::wifi_state_t::CONNECTED);
+                wifi_handler->disconnected_cb_requested = true;
                 auto *event = static_cast<ip_event_got_ip_t*>(event_data);
                 ESP_LOGI(WIFI_LOG_TAG, "Connected to AP. IP-address: " IPSTR, IP2STR(&event->ip_info.ip));
                 /* Reset the flag */
-                wifi_handler->disconnected_cb_requested = true;
                 wifi_handler->f_connected();
                 break;
             }
             case IP_EVENT_STA_LOST_IP: {
-                wifi_handler->set_wifi_state(WifiHandler::wifi_state_t::WAITING_FOR_IP);
+                wifi_handler->_set_wifi_state(WifiHandler::wifi_state_t::WAITING_FOR_IP);
                 ESP_LOGI(WIFI_LOG_TAG, "Device ip-address became invalid.");
                 break;
             }
@@ -82,7 +81,19 @@ namespace wifi
         }
     }
 
-    esp_err_t WifiHandler::_init_nvs_partition() {
+    esp_err_t WifiHandler::_init_wifi_mutexes()
+    {
+        wifi_init_mutex = xSemaphoreCreateMutex();
+        wifi_state_mutex = xSemaphoreCreateMutex();
+        if(wifi_init_mutex == nullptr || wifi_state_mutex == nullptr){
+            return ESP_ERR_NO_MEM;
+        }
+        return ESP_OK;
+    }
+
+
+    esp_err_t WifiHandler::_init_nvs_partition()
+    {
         xSemaphoreTake(this->wifi_init_mutex, pdMS_TO_TICKS(10));
         esp_err_t ret = nvs_flash_init();
         if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -122,6 +133,13 @@ namespace wifi
     esp_err_t WifiHandler::_init(const std::function<void(void)>& on_connected_cb, const std::function<void(void)>& on_disconnected_cb) {
 
         esp_err_t ret = ESP_OK;
+
+        ret = _init_wifi_mutexes();
+        if(ret != ESP_OK) {
+            ESP_LOGE(WIFI_LOG_TAG, "%s", esp_err_to_name(ret));
+            return ret;
+        }
+        std::cout << "Wifi mutexes created." << std::endl;
 
         /* Custom pre-init phase */
         ret = _init_nvs_partition();
@@ -240,7 +258,9 @@ namespace wifi
             ESP_LOGE(WIFI_LOG_TAG, "unable to obtain 'wifi_init_mutex'");
             return ESP_FAIL;
         }
-        state = wifi_state_t::INITIALISED;
+
+        _set_wifi_state(wifi_state_t::INITIALISED);
+
         xSemaphoreGive(wifi_init_mutex);
 
         std::cout << " WifiHandler successfully initialized." << std::endl;
@@ -253,7 +273,7 @@ namespace wifi
     }
 
     esp_err_t WifiHandler::wifi_handler_start() {
-        if(state != wifi_state_t::INITIALISED){
+        if(wifi_state != wifi_state_t::INITIALISED){
             return ESP_FAIL;
         }
         return _start();
@@ -287,14 +307,19 @@ namespace wifi
         return ESP_OK;
     }
 
-    void WifiHandler::set_wifi_state(wifi_state_t new_state) {
-        this->state = new_state;
+    esp_err_t WifiHandler::_set_wifi_state(wifi_state_t new_state) {
+        if(xSemaphoreTake(wifi_state_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {
+            ESP_LOGE(WIFI_LOG_TAG, "unable to obtain 'wifi_state_mutex'");
+            return ESP_FAIL;
+        }
+        this->wifi_state = new_state;
+        xSemaphoreGive(wifi_state_mutex);
+        return ESP_OK;
     }
 
-    WifiHandler::wifi_state_t WifiHandler::get_wifi_state() const {
-        wifi_state_t result = this->state;
+    WifiHandler::wifi_state_t WifiHandler::_get_wifi_state() const {
+        wifi_state_t result = this->wifi_state;
         return result;
     }
-
 
 } // namespace wifi

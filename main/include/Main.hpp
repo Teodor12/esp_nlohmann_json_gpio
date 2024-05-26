@@ -1,10 +1,10 @@
 #pragma once
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "WifiHandler.hpp"
 #include "MQTTHandler.hpp"
 
@@ -15,11 +15,11 @@ class Main final {
 
 public:
 
+    esp_err_t setup();
+    [[noreturn]] void loop();
+
     WifiHandler wifi_handler;
     MQTTHandler mqtt_handler;
-    esp_err_t setup();
-
-    [[noreturn]] void loop();
 
 };
 

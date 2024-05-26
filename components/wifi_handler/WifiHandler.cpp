@@ -10,6 +10,11 @@ namespace wifi
 
     }
 
+    WifiHandler::~WifiHandler() {
+        vSemaphoreDelete(wifi_init_mutex);
+        vSemaphoreDelete(wifi_state_mutex);
+    }
+
     void wifi_event_handler(WifiHandler *wifi_handler, esp_event_base_t event_base, int32_t event_id, void* event_data)
     {
         /* int32_t -> wifi_event_t enum */

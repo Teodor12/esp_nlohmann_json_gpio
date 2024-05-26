@@ -1,11 +1,10 @@
-#include "include/MQTTHandler.hpp"
 #include <iostream>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
-
+#include "include/MQTTHandler.hpp"
 
 namespace mqtt{
 

@@ -1,5 +1,5 @@
-#include "json_validator.hpp"
 #include "esp_log.h"
+#include "json_validator.hpp"
 
 #define JSON_VALIDATOR_LOG_TAG "json_validator"
 

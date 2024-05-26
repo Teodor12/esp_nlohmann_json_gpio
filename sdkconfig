@@ -383,6 +383,14 @@ CONFIG_ESP_WIFI_PASSWORD=""
 # end of Wifi configuration
 
 #
+# GPIO pin configuration
+#
+CONFIG_GPIO_PIN1_NUMBER=25
+CONFIG_GPIO_PIN2_NUMBER=26
+CONFIG_GPIO_PIN3_NUMBER=27
+# end of GPIO pin configuration
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y

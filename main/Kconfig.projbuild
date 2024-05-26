@@ -12,3 +12,27 @@ menu "Wifi configuration"
         help
             WiFi password (WPA or WPA2) for the SSID
 endmenu
+
+menu "GPIO pin configuration"
+
+    config GPIO_PIN1_NUMBER
+        int "Pin number for the first configurable GPIO pin"
+        range 0 39
+        default 25
+        help
+            GPIO pin number for output 1. Valid range 0-39.
+
+    config GPIO_PIN2_NUMBER
+        int "Pin number for the second configurable GPIO pin"
+        range 0 39
+        default 26
+        help
+            GPIO pin number for output 2. Valid range 0-39.
+
+    config GPIO_PIN3_NUMBER
+        int "Pin number for the third configurable GPIO pin"
+        range 0 39
+        default 27
+        help
+            GPIO pin number for output 2. Valid range 0-39.
+endmenu

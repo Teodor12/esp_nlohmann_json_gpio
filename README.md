@@ -1,4 +1,6 @@
-This is a basic test project for an ESP32 devkitc-wroom board to switch 3 of it's pins based on a JSON object.
+# ESP32 LED Control with JSON over MQTT
+
+> This is a basic test project for an ESP32 devkitc-wroom board to switch 3 of it's pins based on a JSON object.
 
 1. configure your Wi-Fi's SSID and password in the "Wifi configuration" menu  Any errors will be asserted with ESP_ERROR_CHECK()!
 2. To set the 3 gpio pins, use the "GPIO configuration" menu(using idf.py menuconfig). I recommend connecting three LEDS on the according pins.

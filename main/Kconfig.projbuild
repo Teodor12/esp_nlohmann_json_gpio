@@ -36,3 +36,24 @@ menu "GPIO pin configuration"
         help
             GPIO pin number for output 2. Valid range 0-39.
 endmenu
+
+menu "MQTT configuration"
+
+    config MQTT_BROKER_IP
+        string "MQTT broker IP-address"
+        default "0.0.0.0"
+        help
+            IP-address of MQTT_BROKER
+
+    config MQTT_BROKER_PORT
+        int "MQTT broker IP-address"
+        default 1883
+        help
+            Port of MQTT_BROKER
+
+    config MQTT_BROKER_TOPIC
+            string "MQTT broker topic"
+            default "default_topic"
+            help
+                Topic of MQTT_BROKER to subscribe to
+endmenu

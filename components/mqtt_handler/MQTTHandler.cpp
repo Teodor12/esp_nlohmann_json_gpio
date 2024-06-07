@@ -9,7 +9,6 @@
 namespace mqtt{
 
 #define MQTT_LOG_TAG "MQTT_HANDLER"
-#define MQTT_TOPIC "esp_gpio"
 
     MQTTHandler::MQTTHandler() {
         mqtt_init_mutex = xSemaphoreCreateMutex();
@@ -32,7 +31,7 @@ namespace mqtt{
             case MQTT_EVENT_CONNECTED: {
                 mqtt_handler->set_mqtt_state(MQTTHandler::mqtt_state_t::MQTT_CONNECTED);
                 ESP_LOGI(MQTT_LOG_TAG, "device established connection with broker");
-                esp_mqtt_client_subscribe(mqtt_handler->mqtt_client, MQTT_TOPIC,0);
+                esp_mqtt_client_subscribe(mqtt_handler->mqtt_client, CONFIG_MQTT_BROKER_TOPIC, 0);
                 break;
             }
             case MQTT_EVENT_DISCONNECTED: {
@@ -95,8 +94,9 @@ namespace mqtt{
         mqtt_cfg = {
                 .broker{
                         .address{
-                                .uri = "mqtt://mqtt.eclipseprojects.io",
-                                .port = 1883,
+                                .hostname = CONFIG_MQTT_BROKER_IP,
+                                .transport = MQTT_TRANSPORT_OVER_TCP,
+                                .port = CONFIG_MQTT_BROKER_PORT,
                         }
                 }
         };

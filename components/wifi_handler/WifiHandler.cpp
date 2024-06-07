@@ -35,7 +35,7 @@ namespace wifi
                     wifi_handler->disconnected_cb_requested = false;
                 }
                 ESP_LOGI(WIFI_LOG_TAG, "device disconnected, reconnecting to AP...");
-                vTaskDelay(pdMS_TO_TICKS(2500));
+                vTaskDelay(pdMS_TO_TICKS(4500));
                 esp_wifi_connect();
                 break;
             }
@@ -307,7 +307,6 @@ namespace wifi
 
         ssid = config_ssid;
         password = config_password;
-
 
         return ESP_OK;
     }

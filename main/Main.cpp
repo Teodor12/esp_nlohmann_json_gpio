@@ -15,7 +15,7 @@ esp_err_t Main::setup()
 
 [[noreturn]] void Main::loop(){
     while (true) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -30,4 +30,5 @@ void wifi_disconnected_cb() {
 extern "C" void app_main(void)
 {
     ESP_ERROR_CHECK(main_entry.setup());
+    vTaskDelete(nullptr);
 }

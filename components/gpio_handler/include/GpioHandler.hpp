@@ -6,11 +6,9 @@
 struct GpioRequest {
 
 public:
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(GpioRequest, gpio_num, state)
-
     int gpio_num;
-    int state;
-
+    bool state;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(GpioRequest, gpio_num, state)
 };
 
 GpioRequest create_gpio_request(const std::string& json_request_str);
